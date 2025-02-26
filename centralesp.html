@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP8266 Sensor Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+    h1 { color: #333; }
+    .data-container { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 20px; }
+    .data-item { border: 1px solid #ddd; padding: 15px; margin: 10px; min-width: 150px; background-color: #f9f9f9; border-radius: 8px; }
+    .data-item h2 { margin-top: 0; color: #555; }
+    .data-value { font-size: 20px; font-weight: bold; color: #007bff; }
+    .status-indicator { color: #888; }
+    .relay-button { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 5px; margin: 5px; }
+    .relay-button.off { background-color: #f44336; }
+    #controls { margin-top: 30px;}
+    #lastUpdated { margin-top: 20px; color: #777; }
+     .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Sensor Data</h1>
+  <div class="data-container">
+    <div class="data-item">
+      <h2>Temperature</h2>
+      <p class="data-value" id="temp">--</p>
+      <p class="status-indicator">°C</p>
+    </div>
+    <div class="data-item">
+      <h2>Humidity</h2>
+      <p class="data-value" id="hum">--</p>
+      <p class="status-indicator">%</p>
+    </div>
+    <div class="data-item">
+      <h2>Pressure</h2>
+      <p class="data-value" id="pressure">--</p>
+      <p class="status-indicator">ATM</p>
+    </div>
+  </div>
+
+  <div id="controls">
+    <h2>Controls</h2>
+    <button id="relay1" class="relay-button" onclick="toggleRelay(1)">Lights</button>
+    <button id="relay2" class="relay-button" onclick="toggleRelay(2)">Fan</button>
+  </div>
+
+    <p id="lastUpdated">Last Updated: --</p>
+    <p id="errorMessage" class="error"></p>
+
+
+  <script>
+    let lastReceived = 0;
+
+    function toggleRelay(relayNum) {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", "/toggle?relay=" + relayNum, true);
+      xhr.send();
+    }
+
+    function updateData() {
+      const xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          try {
+            const data = JSON.parse(this.responseText);
+            document.getElementById("temp").textContent = data.temperature;
+            document.getElementById("hum").textContent = data.humidity;
+            document.getElementById("pressure").textContent = data.pressure;
+            document.getElementById("relay1").textContent = data.relay1 ? "Lights ON" : "Lights OFF";
+            document.getElementById("relay2").textContent = data.relay2 ? "Fan ON" : "Fan OFF";
+            document.getElementById("relay1").classList.toggle("off", !data.relay1);
+            document.getElementById("relay2").classList.toggle("off", !data.relay2);
+             lastReceived = data.timestamp;
+             document.getElementById("lastUpdated").textContent = "Last Updated: " + formatTime(lastReceived);
+             document.getElementById("errorMessage").textContent = ""; // Clear any previous errors
+
+          } catch (error) {
+            console.error("Error parsing JSON:", error);
+             document.getElementById("errorMessage").textContent = "Error parsing data from ESP.";
+          }
+        }  else if (this.readyState == 4) {
+              // Handle non-200 status codes (e.g., 404, 500)
+              document.getElementById("errorMessage").textContent = "Error: Could not retrieve data. Status Code: " + this.status;
+        }
+      };
+      xhr.open("GET", "/data", true);
+      xhr.send();
+    }
+
+    function formatTime(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString(); // Or any other desired format
+    }
+
+    // Initial update
+    updateData();
+
+    // Update data every second - adjust this as needed. Good balance.
+    setInterval(updateData, 1000);
+
+  </script>
+</body>
+</html>
